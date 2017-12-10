@@ -3,19 +3,23 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-
-
 public class PlayerController : MonoBehaviour
 {
-	private int initMass = 25;
-	public int mass = 25;
+	public int initMass;
+	public int prevMass;
+	public int mass;
+	public int pickupMass;
+
 	private int totalScore;
 	public Text totalScoreText;
 	public Text massText;
 
-	public GameObject mySpawner; // Instance of SpawnController for connecting SpawnController script
-	private SpawnController spawnControllerInstance;
+	public GameObject mySpawner; // GameObejct instance for SpawnController
+	private SpawnController spawnControllerInstance; // script instance of SpawnController for connecting SpawnController 
 	private GameObject CollidedObject;
+
+	public GameObject myMassController;
+	private MassController massControllerInstance;
 
 	// for changing scale
 	private Vector3 tempScale;
@@ -31,7 +35,9 @@ public class PlayerController : MonoBehaviour
 	private float followingSpeed = 30.0f;
 	private float boundary; // boundary for preventing to overlap
 
+	public bool eatableStart;
 	public bool eatable;
+	private float eatableTime = 15.0f; // *should be 30sec
 
 	Queue<GameObject> queue = new Queue<GameObject>();
 
@@ -39,14 +45,26 @@ public class PlayerController : MonoBehaviour
 	// all of the Start() is called on the first frame that the script is active
 	void Start ()
 	{
+		spawnControllerInstance = mySpawner.GetComponent<SpawnController> ();
+		massControllerInstance = myMassController.GetComponent<MassController> ();
+
+		initMass = massControllerInstance.initMass;
+		pickupMass = massControllerInstance.pickupMass;
+		if (prevMass != 0) {
+			mass = prevMass;
+		} else {
+			mass = massControllerInstance.mass;
+		}
+
 		SetTotalScoreText ();
 		SetMassText ();
-
-		spawnControllerInstance = mySpawner.GetComponent<SpawnController> ();
 
 		boundary = transform.localScale.x * 3;
 
 		eatable = false;
+		eatableStart = false;
+
+		prevMass = mass;
 	}
 
 	// Update() is called once per frame
@@ -73,7 +91,9 @@ public class PlayerController : MonoBehaviour
 	void FixedUpdate ()
 	{
 		if (queue.Count != 0) {
+			// if gameObject is in the queue, make it ineatable and get it move with splitting speed
 			foreach (GameObject g in queue) {
+				
 				if ((g.transform.position - followingTarget.position).magnitude > boundary) { // prevent shittering
 					g.transform.LookAt (followingTarget.position);
 					g.transform.Translate (0.0f, 0.0f, splitingSpeed * Time.deltaTime);
@@ -81,10 +101,10 @@ public class PlayerController : MonoBehaviour
 			}
 		}
 
-		if(gameObject.CompareTag("User") && eatable == false)
+		// execute SetEatable() one time 
+		if(gameObject.CompareTag("User") && eatableStart == false)
 		{
-			eatable = true; // for executing one time 
-			StartCoroutine (SetEatable (5.0f));
+			StartCoroutine (SetEatable (eatableTime));
 		}
 	}
 
@@ -109,24 +129,17 @@ public class PlayerController : MonoBehaviour
 			Eat();
 		}
 		// when player hit User
-		else if(collider.gameObject.CompareTag("User")) 
+		else if(collider.gameObject.CompareTag("User") && eatable) 
 		{
 			PlayerController CollidedObjectPlayerController = CollidedObject.GetComponent<PlayerController>();
 			int userMass = CollidedObjectPlayerController.GetMass();
 
 			if (mass > userMass) {
-				Debug.Log ("mass > userMass: " + mass + " > " + userMass);
+				//Debug.Log ("mass > userMass: " + mass + " > " + userMass);
 				Eat (CollidedObject);
+				massControllerInstance.DecreaseMass (userMass);
 				Destroy (collider.gameObject);
 			} 
-//			else if(mass < userMass)
-//			{
-//				Debug.Log ("mass < userMass: " + mass + " < " + userMass);
-//			}
-//			else
-//			{
-//				Debug.Log ("mass == userMass");
-//			}
 
 			// run SpawnPickup() for spawning again
 			spawnControllerInstance.InvokeRepeating("SpawnPickup", spawnControllerInstance.spawnTime, 
@@ -142,10 +155,6 @@ public class PlayerController : MonoBehaviour
 				Eat (CollidedObject);
 				collider.gameObject.SetActive(false);
 			}
-//			else
-//			{
-//				Debug.Log ("mass == userMass");
-//			}
 
 			// run SpawnPickup() for spawning again
 			spawnControllerInstance.InvokeRepeating("SpawnPickup", spawnControllerInstance.spawnTime, 
@@ -185,8 +194,10 @@ public class PlayerController : MonoBehaviour
 	// change mass and scale when it eat Pickup
 	void Eat()
 	{
-		mass = mass + 1;
+		prevMass = mass; // save mass before add
+		mass = mass + pickupMass;
 		SetMassText ();
+		massControllerInstance.IncreaseMass (pickupMass);
 
 		tempScale = transform.localScale;
 		float biggerScaleX = tempScale.x + growingSize;
@@ -205,13 +216,15 @@ public class PlayerController : MonoBehaviour
 	// change mass and scale when it eat User
 	void Eat(GameObject user)
 	{
-		
 		PlayerController CollidedObjectPlayerController = CollidedObject.GetComponent<PlayerController>();
 		int userMass = CollidedObjectPlayerController.GetMass();
+
 		Debug.Log ("ate a User!!" + " / " + "userMass: " + mass + " + " + userMass);
+		prevMass = mass;// save mass before add
 		mass = mass + userMass;
 		Debug.Log ("= " + mass);
 		SetMassText ();
+		Debug.Log ("userMass" + userMass);
 
 		tempScale = transform.localScale;
 		float biggerScaleX = tempScale.x + userMass * growingSize;
@@ -246,7 +259,7 @@ public class PlayerController : MonoBehaviour
 	void Split()
 	{
 		MakeSizeHalf(); // make player half size first
-
+		prevMass = mass;
 		// and instantiate(create) the pickup prefab with the above position and rotation
 		splittedPickup = (GameObject)Instantiate(this.gameObject, transform.localPosition, transform.rotation);
 
@@ -289,17 +302,20 @@ public class PlayerController : MonoBehaviour
 		}
 	}
 
-	// make divided one eatable after some time later.
-	IEnumerator SetEatable(float time)
+	// make divided one eatable adding properties of Rigidbody and isKinematic after some time later.
+	IEnumerator SetEatable(float t)
 	{
-		yield return new WaitForSeconds(time);
+		eatableStart = true; // for executing one time 
+
+		yield return new WaitForSeconds(t);
+		eatable = true; // make eatable true after that t time later 
 		Debug.Log ("SetEatable!!");
 
 		// if it doesn't have rigidbody, make it
 		if (!gameObject.GetComponent<Rigidbody> ()) {
 			Rigidbody rigidbody = gameObject.AddComponent<Rigidbody> ();
 			rigidbody.isKinematic = true;
-		} 
+		}
 		else // if it has rigidbody
 		{
 			Rigidbody rigidbody = gameObject.GetComponent<Rigidbody> ();

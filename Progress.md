@@ -1,23 +1,38 @@
 Title: Agar.io like game
 
 Progressed
-  Map O
-  Player O
-  Spawning Colorful Pickup O
-  Scoring system O
-  Make player splitable O
-    make player move faster O
-    make player half size when it is spliting O
-    make splited one Follow original player O
+  Map (done)
+  Player (done)
+  Spawning Colorful Pickup (done)
+  Scoring system (done)
+  Make player splitable (done)
+    make player move faster (done)
+    make player half size when it is spliting (done)
+    make splited one Follow original player (done)
+  Merge the divided mass to original after some time pass away (done)
 
 On Progress
-  Merge the divided mass to original after some time pass away
-  
-Next Progress 
-  Third person pointview with Following camera
-  Make vs mode with socket or 1 vs 1 mode with split window
-  Make player Ejectable
-  
+  Third person pointview with Following camera (done)
+    Main Camera stop problem when player deactivated (done)
+      change the camera target to pointer and change the view of camera using total mass system. (done)
+        Different Total mass problem when splited on odd number
 
-  unimportant
-    Add player Color picking process 
+Next Progress 
+  Player can go out problem
+
+  Make player Ejectable
+
+  ajust mass & scale changing system(using cube root (ex)3, 9, 27) 
+  
+  Make 'multi play mode' with socket or '1 vs 1 mode' with splitting window
+
+Trivial Things
+  Add player Color picking process 
+  too big collider problem
+
+conclusion
+  following pointer system
+  automatic respowning pickups
+  scale up system when player hit a pickup or user(scale, mass, camera view will be changed)
+  splitable player(splitted player will be faster in 1 sec)
+
